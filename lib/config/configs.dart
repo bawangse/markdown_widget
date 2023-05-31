@@ -1,4 +1,85 @@
+import 'package:flutter/rendering.dart';
+import 'package:flutter/widgets.dart';
+import 'package:logger/logger.dart';
+import 'package:markdown/markdown.dart';
+import 'package:scroll_to_index/scroll_to_index.dart';
+
 import '../widget/all.dart';
+
+Logger mdLog = Logger(
+  printer: PrettyPrinter(
+      methodCount: 1, // number of method calls to be displayed
+      errorMethodCount: 8, // number of method calls if stacktrace is provided
+      colors: true, // Colorful log messages
+      printEmojis: true, // Print an emoji for each log message
+      printTime: true // Should each log print contain a timestamp
+      ),
+);
+
+// 用来保存md的数据，用来传递给外部
+class MdData {
+  /// 记录item的高度，key是 index ，值是高度
+  Map height = {};
+
+  /// 记录item的值，key是 index ，值是text-而不是node
+  Map text = {};
+
+  /// 记录item的值，key是 index ，值是text-而不是node
+  List<Widget> widgets = [];
+
+  /// md本身的control
+  AutoScrollController? mdControl;
+
+  /// toc本身的control
+  AutoScrollController? tocControl;
+}
+
+MdData mdObj = MdData();
+
+class MdConfig {
+  // int tocIndex; // toc里面是第几个listItem
+  // int tocoffset; // toc当前距离当前的高度
+  // md的initState调用
+  /// md初始化时要做的事情
+  void Function(AutoScrollController)? mdInitStateCall;
+
+  /// toc初始化时要做的事情
+  void Function(AutoScrollController)? tocInitStateCall;
+
+  /// toc里面点击目录时要做的事情
+  void Function(int)? clickTocCall;
+
+  /// md的height参数计算完毕啦
+  void Function(MdData mdObj)? getMdObjCall;
+
+  /// 选中文本时要做的事情
+  void Function(SelectedContent?)? onSelectionChanged;
+
+  /// 初始化md时，对md的组件进行改造，主要用于给md组件加些额外的操作，比如行双击
+  Widget Function(List<Node> nodes, int index, InlineSpan span)? initMdNode;
+
+  /// 阅读md的index，使用对象传递，['index']
+  Map? mdReadObj;
+
+  /// md的style，普通行、间隔行设置的背景色是不同的
+  TextStyle? commonStyle;
+  TextStyle? highLightStyle;
+
+  MdConfig({
+    this.mdInitStateCall,
+    this.tocInitStateCall,
+    this.clickTocCall,
+    this.getMdObjCall,
+    this.onSelectionChanged,
+    this.initMdNode,
+    this.mdReadObj,
+    this.commonStyle,
+    this.highLightStyle,
+  });
+}
+
+/// 真正初始化在 lib/source/markdown_widget/lib/widget/markdown.dart 的initState里面
+var mdSignConfig = MdConfig();
 
 abstract class WidgetConfig {
   ///every config has a tag

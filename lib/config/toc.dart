@@ -13,7 +13,7 @@ import '../widget/proxy_rich_text.dart';
 /// and each [TocWidget] corresponds to a [MarkdownWidget].
 class TocController {
   ///key is index of widgets, value is [Toc]
-  final LinkedHashMap<int, Toc> _index2toc = new LinkedHashMap();
+  final LinkedHashMap<int, Toc> _index2toc = LinkedHashMap();
 
   ValueCallback<int>? _jumpToIndexCallback;
   ValueCallback<int>? _onIndexChangedCallback;
@@ -124,11 +124,15 @@ class _TocWidgetState extends State<TocWidget> {
       final selfIndex = tocController._index2toc[index]?.selfIndex;
       if (selfIndex != null && _tocList.length > selfIndex) {
         refreshIndex(selfIndex);
+        mdLog.i('进行跳转toc$currentIndex');
         controller.scrollToIndex(currentIndex,
+            // duration: const Duration(milliseconds: 20),
             preferPosition: AutoScrollPosition.begin);
       }
     };
     _refreshList(tocController.tocList);
+    mdSignConfig.tocInitStateCall!(controller);
+    mdObj.tocControl = controller;
   }
 
   void _refreshList(List<Toc> list) {
@@ -174,6 +178,8 @@ class _TocWidgetState extends State<TocWidget> {
           onTap: () {
             tocController.jumpToIndex(currentToc.widgetIndex);
             refreshIndex(index);
+            int indexTmp = index;
+            mdSignConfig.clickTocCall!(indexTmp);
           },
         );
         return wrapByAutoScroll(index, child, controller);
@@ -221,7 +227,9 @@ final headingTag2Level = <String, int>{
 };
 
 class _TocHeadingConfig extends HeadingConfig {
+  @override
   final TextStyle style;
+  @override
   final String tag;
 
   _TocHeadingConfig(this.style, this.tag);

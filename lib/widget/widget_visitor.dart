@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:markdown/markdown.dart' as m;
 import 'package:markdown_widget/config/configs.dart';
 import 'package:markdown_widget/widget/all.dart';
@@ -36,17 +36,27 @@ class WidgetVisitor implements m.NodeVisitor {
     this.textGenerator,
   }) {
     this.config = config ?? MarkdownConfig.defaultConfig;
-    generators.forEach((e) {
+    for (var e in generators) {
       _tag2node[e.tag] = e.generator;
-    });
+    }
   }
 
   ///[visit] will return a [SpanNode] list
   List<SpanNode> visit(List<m.Node> nodes) {
     _spans.clear();
     _currentSpanIndex = 0;
-    for (final node in nodes) {
-      final emptyNode = ConcreteElementNode();
+    // for (final node in nodes) {
+    for (int i = 0; i < nodes.length; i++) {
+      final node = nodes[i];
+      TextStyle? style;
+      if (i % 2 == 0) {
+        style = mdSignConfig.commonStyle;
+      } else {
+        style = mdSignConfig.highLightStyle;
+      }
+      final emptyNode = ConcreteElementNode(
+        style: style,
+      );
       _spans.add(emptyNode);
       _currentSpanIndex = _spans.length - 1;
       _spansStack.add(emptyNode);

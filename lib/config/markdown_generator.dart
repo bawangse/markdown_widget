@@ -24,7 +24,7 @@ class MarkdownGenerator {
     this.generators = const [],
     this.onNodeAccepted,
     this.textGenerator,
-  }) : this.config = config ?? MarkdownConfig.defaultConfig;
+  }) : config = config ?? MarkdownConfig.defaultConfig;
 
   ///convert [data] to widgets
   ///[onTocList] can provider [Toc] list
@@ -36,7 +36,9 @@ class MarkdownGenerator {
       inlineSyntaxes: inlineSyntaxes,
       blockSyntaxes: blockSyntaxes,
     );
+    // lines是啥？每一行的字符串
     final List<String> lines = data.split(RegExp(r'(\r?\n)|(\r?\t)|(\r)'));
+// 这里面返回的是node，对字符串进行了处理，所以100行字符串可能有20个node
     final List<m.Node> nodes = document.parseLines(lines);
     final List<Toc> tocList = [];
     final visitor = WidgetVisitor(
@@ -51,22 +53,31 @@ class MarkdownGenerator {
                 Toc(node: node, widgetIndex: index, selfIndex: listLength));
           }
         });
+    // nodes的数量就是spans的数量
     final spans = visitor.visit(nodes);
+    // mdLog.i('对比：${spans.length}  ${nodes.length}');
     onTocList?.call(tocList);
     final List<Widget> widgets = [];
-    spans.forEach((span) {
-      InlineSpan inlineSpan = span.build();
-      if(inlineSpan is TextSpan){
+    for (var i = 0; i < spans.length; i++) {
+      InlineSpan span = spans[i].build();
+      if(span is TextSpan){
         ///fix: line breaks are not effective when copying.
         ///see [https://github.com/asjqkkkk/markdown_widget/issues/105]
         ///see [https://github.com/asjqkkkk/markdown_widget/issues/95]
-        inlineSpan.children?.add(TextSpan(text: '\r'));
+        span.children?.add(TextSpan(text: '\r'));
       }
+      // var node = nodes[i];
+      // 如果要放到外面的话，下面的 widgets.add 要进行处理。
+      Widget text = Text.rich(span);
+      if (mdSignConfig.initMdNode != null) {
+        text = mdSignConfig.initMdNode!(nodes, i, span);
+      }
+      mdObj.text[i] = nodes[i].textContent;
       widgets.add(Padding(
         padding: linesMargin,
-        child: Text.rich(inlineSpan),
+        child: text,
       ));
-    });
+    }
     return widgets;
   }
 }

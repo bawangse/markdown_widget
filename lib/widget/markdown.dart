@@ -30,6 +30,7 @@ class MarkdownWidget extends StatefulWidget {
 
   ///config for [MarkdownGenerator]
   final MarkdownGeneratorConfig? markdownGeneratorConfig;
+  final MdConfig? mdConfig;
 
   const MarkdownWidget({
     Key? key,
@@ -41,6 +42,7 @@ class MarkdownWidget extends StatefulWidget {
     this.padding,
     this.config,
     this.markdownGeneratorConfig,
+    this.mdConfig,
   }) : super(key: key);
 
   @override
@@ -52,7 +54,7 @@ class _MarkdownWidgetState extends State<MarkdownWidget> {
   late MarkdownGenerator markdownGenerator;
 
   ///The markdown string converted by MarkdownGenerator will be retained in the [_widgets]
-  List<Widget> _widgets = [];
+  final List<Widget> _widgets = [];
 
   ///[TocController] combines [TocWidget] and [MarkdownWidget]
   TocController? _tocController;
@@ -65,15 +67,28 @@ class _MarkdownWidgetState extends State<MarkdownWidget> {
 
   ///if the [ScrollDirection] of [ListView] is [ScrollDirection.forward], [isForward] will be true
   bool isForward = true;
+  List<Widget> alls = [];
+  bool isFirstGetAll = true;
 
   @override
   void initState() {
     super.initState();
     _tocController = widget.tocController;
     _tocController?.jumpToIndexCallback = (index) {
-      controller.scrollToIndex(index, preferPosition: AutoScrollPosition.begin);
+      mdLog.i('进行跳转toc$index');
+      controller.scrollToIndex(index,
+          // duration: const Duration(milliseconds: 20),
+          preferPosition: AutoScrollPosition.begin);
     };
+    mdSignConfig = widget.mdConfig!;
+    widget.mdConfig!.mdInitStateCall!(controller);
+    mdObj.mdControl = controller;
     updateState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      int startTime = DateTime.now().millisecondsSinceEpoch;
+      int endTime = DateTime.now().millisecondsSinceEpoch;
+      mdLog.i('md本身-渲染完毕耗时：${(endTime - startTime) / 1000} s');
+    });
   }
 
   ///when we've got the data, we need update data without setState() to avoid the flicker of the view
@@ -94,7 +109,9 @@ class _MarkdownWidgetState extends State<MarkdownWidget> {
         markdownGenerator.buildWidgets(widget.data, onTocList: (tocList) {
       _tocController?.setTocList(tocList);
     });
+    // mdLog.i('md:$result');
     _widgets.addAll(result);
+    mdObj.widgets = _widgets;
   }
 
   ///this method will be called when [updateState] or [dispose]
@@ -116,25 +133,92 @@ class _MarkdownWidgetState extends State<MarkdownWidget> {
 
   ///
   Widget buildMarkdownWidget() {
+    ListView mdListViewWidget = ListView.builder(
+      shrinkWrap: widget.shrinkWrap,
+      physics: widget.physics,
+      controller: controller,
+      itemBuilder: (ctx, index) {
+        Widget itemWidget = wrapByAutoScroll(index,
+            wrapByVisibilityDetector(index, _widgets[index]), controller);
+
+        Widget getHeight1 = LayoutBuilder(
+          builder: (context, constraints) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              // 检查组件是否仍处于活动状态
+              if (mounted) {
+                RenderBox? itemBox = context.findRenderObject() as RenderBox?;
+                double itemHeight = itemBox!.size.height;
+                mdLog.i('height: $itemHeight, index: $index');
+                mdObj.height[index] = itemHeight;
+                if (index == _widgets.length - 1 &&
+                    mdSignConfig.getMdObjCall != null) {
+                  mdSignConfig.getMdObjCall!(mdObj);
+                }
+              }
+            });
+            return itemWidget;
+          },
+        );
+
+        final itemKey = GlobalKey();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final RenderBox? itemBox =
+              itemKey.currentContext?.findRenderObject() as RenderBox?;
+        });
+        /* return Container(
+            key: itemKey,
+            child: itemWidget,
+          ); */
+        // return getHeight1;
+        return itemWidget;
+      },
+      itemCount: _widgets.length,
+      padding: widget.padding,
+    );
     final markdownWidget = NotificationListener<UserScrollNotification>(
       onNotification: (notification) {
         final ScrollDirection direction = notification.direction;
         isForward = direction == ScrollDirection.forward;
         return true;
       },
-      child: ListView.builder(
-        shrinkWrap: widget.shrinkWrap,
-        physics: widget.physics,
-        controller: controller,
-        itemBuilder: (ctx, index) => wrapByAutoScroll(index,
-            wrapByVisibilityDetector(index, _widgets[index]), controller),
-        itemCount: _widgets.length,
-        padding: widget.padding,
-      ),
+      child: mdListViewWidget,
     );
-    return widget.selectable
-        ? SelectionArea(child: markdownWidget)
+    Widget select = widget.selectable
+        ? SelectionArea(
+            onSelectionChanged: mdSignConfig.onSelectionChanged,
+            child: markdownWidget)
         : markdownWidget;
+
+    Widget all = ListView(
+      children: List<Widget>.generate(_widgets.length, (index) {
+        Widget itemWidget = wrapByAutoScroll(index,
+            wrapByVisibilityDetector(index, _widgets[index]), controller);
+        final itemKey = GlobalKey();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final RenderBox? itemBox =
+              itemKey.currentContext?.findRenderObject() as RenderBox?;
+          if (itemBox != null) {
+            final double itemHeight = itemBox.size.height;
+            mdObj.height[index] = itemHeight;
+            mdLog.i('height: $itemHeight, index: $index');
+          }
+        });
+
+        return Container(
+          key: itemKey,
+          child: itemWidget,
+        );
+      }),
+    );
+    /* return Container(
+      child: Column(
+        children: [
+          // select,
+          all,
+        ],
+      ),
+    ); */
+    return select;
   }
 
   ///wrap widget by [VisibilityDetector] that can know if [child] is visible
@@ -175,7 +259,7 @@ Widget wrapByAutoScroll(
     key: Key(index.toString()),
     controller: controller,
     index: index,
-    child: child,
     highlightColor: Colors.black.withOpacity(0.1),
+    child: child,
   );
 }

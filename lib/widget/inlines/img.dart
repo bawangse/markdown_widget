@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:markdown_widget/markdown_widget.dart';
@@ -16,12 +18,13 @@ class ImageNode extends SpanNode {
     double? width;
     double? height;
     if (attributes['width'] != null) width = double.parse(attributes['width']!);
-    if (attributes['height'] != null)
+    if (attributes['height'] != null) {
       height = double.parse(attributes['height']!);
+    }
     final imageUrl = attributes['src'] ?? '';
     final alt = attributes['alt'] ?? '';
     final isNetImage = imageUrl.startsWith('http');
-    final imgWidget = isNetImage
+    var imgWidget = isNetImage
         ? Image.network(imageUrl,
             width: width,
             height: height,
@@ -32,11 +35,20 @@ class ImageNode extends SpanNode {
             errorBuilder: (ctx, error, stacktrace) {
             return buildErrorImage(imageUrl, alt, error);
           });
+    if (imageUrl.contains('aknow/docs/')) {
+      imgWidget = Image.file(File(imageUrl),
+          width: width,
+          height: height,
+          fit: BoxFit.cover, errorBuilder: (ctx, error, stacktrace) {
+        mdLog.i('error$ctx, $error, $stacktrace');
+        return buildErrorImage(imageUrl, alt, error);
+      });
+    }
     final result = (parent != null && parent is LinkNode)
         ? imgWidget
         : Builder(builder: (context) {
             return InkWell(
-              child: Hero(child: imgWidget, tag: imgWidget.hashCode),
+              child: Hero(tag: imgWidget.hashCode, child: imgWidget),
               onTap: () => _showImage(context, imgWidget),
             );
           });
@@ -95,7 +107,7 @@ class ImageViewer extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             InteractiveViewer(
-                child: Center(child: Hero(child: child, tag: child.hashCode))),
+                child: Center(child: Hero(tag: child.hashCode, child: child))),
             Align(
               alignment: Alignment.bottomCenter,
               child: Padding(
@@ -103,15 +115,15 @@ class ImageViewer extends StatelessWidget {
                 child: IconButton(
                   onPressed: () => Navigator.of(context).pop(),
                   icon: Container(
-                    child: Icon(
-                      Icons.clear,
-                      color: Colors.grey,
-                    ),
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.2),
                         shape: BoxShape.circle),
+                    child: const Icon(
+                      Icons.clear,
+                      color: Colors.grey,
+                    ),
                   ),
                 ),
               ),
@@ -123,5 +135,6 @@ class ImageViewer extends StatelessWidget {
   }
 }
 
-typedef Widget ImgBuilder(String url, Map<String, String> attributes);
-typedef Widget ErrorImgBuilder(String url, String alt, Object error);
+typedef ImgBuilder = Widget Function(
+    String url, Map<String, String> attributes);
+typedef ErrorImgBuilder = Widget Function(String url, String alt, Object error);
